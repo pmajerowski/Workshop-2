@@ -4,19 +4,14 @@ import org.mindrot.jbcrypt.BCrypt;
 import pl.coderslab.DbUtil;
 
 import java.sql.*;
+import java.util.ArrayList;
 
 public class UserDao {
     private static final String CREATE_USER_QUERY =
             "INSERT INTO users(username, email, password) VALUES (?, ?, ?);";
 
-    private static final String UPDATE_USERNAME_QUERY =
-            "UPDATE users SET username = ? WHERE id = ?;";
-
-    private static final String UPDATE_EMAIL_QUERY =
-            "UPDATE users SET email = ? WHERE id = ?;";
-
-    private static final String UPDATE_PASSWORD_QUERY =
-            "UPDATE users SET password = ? WHERE id = ?;";
+    private static final String UPDATE_USER_QUERY =
+            "UPDATE users SET username = ?, email = ?, password = ? WHERE id = ?;";
 
     private static final String SELECT_USER_BY_ID_QUERY =
             "SELECT id AS id, username AS u, email AS e, password AS p FROM users WHERE id = ?;";
@@ -27,22 +22,21 @@ public class UserDao {
     private static final String SELECT_ALL_USERS_QUERY =
             "SELECT * FROM users;";
 
-    public String hashPassword(String password) {
+    private String hashPassword(String password) {
         return BCrypt.hashpw(password, BCrypt.gensalt());
     }
 
-
     public User create(User user) {
         try (Connection conn = DbUtil.connect()) {
-            PreparedStatement prepStatement =
+            PreparedStatement prepInsertStatement =
                     conn.prepareStatement(CREATE_USER_QUERY, Statement.RETURN_GENERATED_KEYS);
 //            INSERT INTO users(username, email, password) VALUES (?, ?, ?);
-            prepStatement.setString(1, user.getUserName());
-            prepStatement.setString(2, user.getEmail());
-            prepStatement.setString(3, hashPassword(user.getPassword()));
-            prepStatement.executeUpdate();
+            prepInsertStatement.setString(1, user.getUserName());
+            prepInsertStatement.setString(2, user.getEmail());
+            prepInsertStatement.setString(3, hashPassword(user.getPassword()));
+            prepInsertStatement.executeUpdate();
 
-            ResultSet resultSet = prepStatement.getGeneratedKeys();
+            ResultSet resultSet = prepInsertStatement.getGeneratedKeys();
             if (resultSet.next()) {
                 user.setId(resultSet.getInt(1));
             }
@@ -55,17 +49,17 @@ public class UserDao {
 
     public User read(int userId) {
         try (Connection conn = DbUtil.connect()) {
-            PreparedStatement prepStatement = conn.prepareStatement(SELECT_USER_BY_ID_QUERY);
+            PreparedStatement prepSelectStatement = conn.prepareStatement(SELECT_USER_BY_ID_QUERY);
 //            SELECT id AS id, username AS u, email AS e, password AS p FROM users WHERE id = ?;
-            prepStatement.setString(1, String.valueOf(userId));
-            prepStatement.executeQuery();
-            ResultSet resultSet = prepStatement.getResultSet();
+            prepSelectStatement.setString(1, String.valueOf(userId));
+            prepSelectStatement.executeQuery();
+            ResultSet resultSet = prepSelectStatement.getResultSet();
 
             String userName = "";
             String userEmail = "";
             String userPass = "";
             while (resultSet.next()) {
-                if(resultSet.getString("id").isEmpty()) {
+                if (resultSet.getString("id").isEmpty()) {
                     return null;
                 } else {
                     userName = resultSet.getString("u");
@@ -84,4 +78,54 @@ public class UserDao {
         }
     }
 
+    public void update(User user) {
+        try (Connection conn = DbUtil.connect()) {
+            PreparedStatement prepUpdateStatement = conn.prepareStatement(UPDATE_USER_QUERY);
+//            UPDATE users SET username = ?, email = ?, password = ? WHERE id = ?;
+            prepUpdateStatement.setString(1, user.getUserName());
+            prepUpdateStatement.setString(2, user.getEmail());
+            prepUpdateStatement.setString(3, hashPassword(user.getPassword()));
+            prepUpdateStatement.setString(4, String.valueOf(user.getId()));
+            prepUpdateStatement.executeUpdate();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void delete(int userId) {
+        try (Connection conn = DbUtil.connect()) {
+            PreparedStatement prepDeleteStatement = conn.prepareStatement(DELETE_USER_BY_ID_QUERY);
+//            DELETE FROM users WHERE id = ?;
+            prepDeleteStatement.setString(1, String.valueOf(userId));
+            prepDeleteStatement.executeUpdate();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public ArrayList<User> findAll() {
+        ArrayList<User> users = new ArrayList<>();
+        try (Connection conn = DbUtil.connect()) {
+            PreparedStatement prepSelectAllStatement = conn.prepareStatement(SELECT_ALL_USERS_QUERY);
+//            SELECT * FROM users;
+            prepSelectAllStatement.executeQuery();
+            ResultSet allUsers = prepSelectAllStatement.getResultSet();
+
+            while (allUsers.next()) {
+                User user = new User();
+                user.setId(allUsers.getInt(1));
+                user.setEmail(allUsers.getString(2));
+                user.setUserName(allUsers.getString(3));
+                user.setPassword(allUsers.getString(4));
+                users.add(user);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
+        }
+        return  users;
+    }
 }
