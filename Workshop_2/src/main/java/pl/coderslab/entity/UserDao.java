@@ -60,22 +60,21 @@ public class UserDao {
             String userPass = "";
             while (resultSet.next()) {
                 if (resultSet.getString("id").isEmpty()) {
-                    return null;
+                    break;
                 } else {
                     userName = resultSet.getString("u");
                     userEmail = resultSet.getString("e");
                     userPass = resultSet.getString("p");
+                    User user = new User(userName, userEmail, userPass);
+                    user.setId(userId);
+                    return user;
                 }
             }
-
-            User user = new User(userName, userEmail, userPass);
-            user.setId(userId);
-            return user;
-
         } catch (SQLException e) {
             e.printStackTrace();
             return null;
         }
+        return null;
     }
 
     public void update(User user) {
@@ -94,6 +93,7 @@ public class UserDao {
     }
 
     public void delete(int userId) {
+        int sumIdBeforeDelete = idSumVerification();
         try (Connection conn = DbUtil.connect()) {
             PreparedStatement prepDeleteStatement = conn.prepareStatement(DELETE_USER_BY_ID_QUERY);
 //            DELETE FROM users WHERE id = ?;
@@ -103,6 +103,26 @@ public class UserDao {
         } catch (Exception e) {
             e.printStackTrace();
         }
+        int sumIdAfterDelete = idSumVerification();
+        System.out.println(
+                sumIdBeforeDelete == sumIdAfterDelete ? "No user with such ID" : "User deleted"
+        );
+    }
+
+    private int idSumVerification() {
+        int sumId = 0;
+        try (Connection conn = DbUtil.connect()) {
+            PreparedStatement prepIdSumStatement =
+                    conn.prepareStatement("select sum(id) from users;");
+            prepIdSumStatement.executeQuery();
+            while (prepIdSumStatement.getResultSet().next()) {
+                sumId += prepIdSumStatement.getResultSet().getInt(1);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return sumId;
     }
 
     public ArrayList<User> findAll() {
@@ -126,6 +146,6 @@ public class UserDao {
             e.printStackTrace();
             return null;
         }
-        return  users;
+        return users;
     }
 }
